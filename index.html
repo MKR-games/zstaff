@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>직원 스케줄러</title>
+  <meta name="referrer" content="no-referrer-when-downgrade" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">KOREA · MON–SUN · 연중무휴</div>
+        <h1>직원 스케줄러</h1>
+      </div>
+
+      <div class="top-right">
+        <div class="cloud-control">
+          <span class="cloud-status syncing" id="cloudStatus" title="Firebase 연결 상태">Firebase 연결 중…</span>
+        </div>
+
+        <div class="top-actions">
+          <button class="btn secondary" id="employeeBtn">직원 등록</button>
+          <button class="btn secondary" id="personalBtn">개인 일정 추가</button>
+          <button class="btn copy" id="copyWeekBtn">스케줄 복사</button>
+          <button class="btn danger-soft" id="resetWeekBtn">이번 주 스케줄 초기화</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="week-toolbar">
+        <div class="week-nav">
+          <button class="icon-btn" id="prevWeek" aria-label="지난주">←</button>
+          <button class="btn ghost" id="todayWeek">이번주</button>
+          <button class="icon-btn" id="nextWeek" aria-label="다음주">→</button>
+        </div>
+
+        <div class="week-title-wrap">
+          <div id="weekTitle" class="week-title"></div>
+          <div class="week-caption">근무 등록 09:30–22:00 · 주말은 출근 시각만 입력</div>
+        </div>
+
+        <div class="mode-chip active">바로 작성 가능</div>
+      </section>
+
+      <section class="workspace">
+        <aside class="sidebar">
+          <div class="side-head">
+            <h2>직원</h2>
+            <span id="employeeCount" class="count">0명</span>
+          </div>
+
+          <p class="hint" id="sideHint">직원 카드를 위아래로 끌면 순서가 바뀝니다. 캘린더 시간대로 끌어 놓으면 근무가 등록됩니다.</p>
+          <div id="employeeList" class="employee-list"></div>
+
+          <div class="legend">
+            <div class="legend-item"><span class="swatch unavailable"></span>개인 일정 / 근무 불가</div>
+            <div class="legend-item"><span class="swatch shift"></span>근무 스케줄</div>
+            <div class="legend-item"><span class="swatch unknown"></span>주말 퇴근 미정</div>
+          </div>
+        </aside>
+
+        <section class="calendar-wrap">
+          <div id="calendar" class="calendar"></div>
+        </section>
+      </section>
+    </main>
+
+    <!-- 모바일 전용: 조회 + 개인 일정 관리 -->
+    <section class="mobile-app" id="mobileApp" aria-label="모바일 직원 스케줄">
+      <div class="mobile-head">
+        <div>
+          <div class="eyebrow">MOBILE · READ ONLY SHIFT</div>
+          <h2>직원 스케줄</h2>
+        </div>
+        <span class="mobile-sync" id="mobileCloudStatus">연결 중…</span>
+      </div>
+
+      <div class="mobile-week-nav">
+        <button type="button" class="mobile-nav-btn" id="mobilePrevWeek" aria-label="지난주">←</button>
+        <button type="button" class="mobile-week-title" id="mobileTodayWeek">
+          <strong id="mobileWeekTitle"></strong>
+          <span>이번주로 이동</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" id="mobileNextWeek" aria-label="다음주">→</button>
+      </div>
+
+      <div class="mobile-view-switch" role="tablist" aria-label="모바일 보기 방식">
+        <button type="button" class="mobile-switch active" data-mobile-view="week" role="tab">주간 한눈에</button>
+        <button type="button" class="mobile-switch" data-mobile-view="day" role="tab">날짜별</button>
+      </div>
+
+      <div class="mobile-week-view" id="mobileWeekView">
+        <div class="mobile-overview-scroll">
+          <div id="mobileOverview"></div>
+        </div>
+        <p class="mobile-guide">근무 스케줄은 PC에서만 수정할 수 있습니다. ● 표시는 개인 일정이 있는 날입니다.</p>
+      </div>
+
+      <div class="mobile-day-view hidden" id="mobileDayView">
+        <div class="mobile-day-tabs" id="mobileDayTabs"></div>
+        <div class="mobile-day-summary" id="mobileDaySummary"></div>
+      </div>
+
+      <button type="button" class="mobile-personal-cta" id="mobilePersonalBtn">
+        <span class="mobile-plus">＋</span>
+        개인 일정 추가
+      </button>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+<!-- 스케줄 복사 범위 선택 -->
+  <dialog id="captureDialog" class="dialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">COPY SCHEDULE</div>
+          <h3>복사 범위 선택</h3>
+          <p class="dialog-desc">현재 보고 있는 주에서 복사할 날짜 범위를 선택하세요.</p>
+        </div>
+        <button class="close-btn dialog-close" id="captureCloseBtn" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <div class="capture-options">
+        <button type="button" class="capture-option" data-capture-range="all">
+          <strong>전체</strong>
+          <span>월요일 ~ 일요일</span>
+        </button>
+        <button type="button" class="capture-option" data-capture-range="weekday">
+          <strong>주간</strong>
+          <span>월요일 ~ 금요일</span>
+        </button>
+        <button type="button" class="capture-option" data-capture-range="weekend">
+          <strong>주말</strong>
+          <span>토요일 ~ 일요일</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 직원 등록 / 수정 -->
+  <dialog id="employeeDialog" class="dialog">
+    <form method="dialog" id="employeeForm" class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">EMPLOYEE</div>
+          <h3 id="employeeDialogTitle">직원 등록</h3>
+        </div>
+        <button class="close-btn dialog-close" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <input type="hidden" id="employeeId" />
+
+      <label>
+        <span>이름</span>
+        <input id="employeeName" autocomplete="off" required placeholder="예: 김민지" />
+      </label>
+
+      <label>
+        <span>직책</span>
+        <select id="employeeRole">
+          <option value="관리자">관리자</option>
+          <option value="정직원">정직원</option>
+          <option value="주말아르바이트">주말아르바이트</option>
+        </select>
+      </label>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn danger hidden" id="deleteEmployeeBtn">직원 삭제</button>
+        <span class="spacer"></span>
+        <button class="btn ghost dialog-cancel" type="button">취소</button>
+        <button type="submit" class="btn primary">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 개인 일정 -->
+  <dialog id="personalDialog" class="dialog wide">
+    <form method="dialog" id="personalForm" class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">PERSONAL AVAILABILITY</div>
+          <h3 id="personalDialogTitle">개인 일정 추가</h3>
+          <p class="dialog-desc" id="personalDialogDesc">직원과 날짜를 선택해 근무할 수 없는 시간을 등록합니다.</p>
+        </div>
+        <button class="close-btn dialog-close" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <input type="hidden" id="personalId" />
+
+      <div class="mini-calendar-toolbar">
+        <button type="button" class="icon-btn" id="personalPrev">←</button>
+        <strong id="personalMonthTitle"></strong>
+        <button type="button" class="icon-btn" id="personalNext">→</button>
+      </div>
+      <div id="miniCalendar" class="mini-calendar"></div>
+
+      <div class="form-grid">
+        <label>
+          <span>직원</span>
+          <select id="personalEmployee" required></select>
+        </label>
+        <label>
+          <span>선택 날짜</span>
+          <input id="personalDate" type="date" required />
+        </label>
+      </div>
+
+      <label class="check-row">
+        <input id="allDay" type="checkbox" />
+        <span>하루종일 근무 불가</span>
+      </label>
+
+      <div class="form-grid" id="personalTimeFields">
+        <label>
+          <span>시작</span>
+          <input id="personalStart" type="time" value="10:00" step="1800" />
+        </label>
+        <label>
+          <span>종료</span>
+          <input id="personalEnd" type="time" value="18:00" step="1800" />
+        </label>
+      </div>
+
+      <label>
+        <span>메모 (선택)</span>
+        <input id="personalMemo" autocomplete="off" placeholder="예: 학교, 병원, 약속" />
+      </label>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn danger hidden" id="deletePersonalBtn">개인 일정 삭제</button>
+        <span class="spacer"></span>
+        <button class="btn ghost dialog-cancel" type="button">취소</button>
+        <button type="submit" class="btn primary" id="savePersonalBtn">일정 저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 근무 수정 -->
+  <dialog id="shiftDialog" class="dialog">
+    <form method="dialog" id="shiftForm" class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">SHIFT</div>
+          <h3>근무 시간 수정</h3>
+        </div>
+        <button class="close-btn dialog-close" type="button" aria-label="닫기">×</button>
+      </div>
+
+      <input type="hidden" id="shiftId" />
+      <div id="shiftEmployeeLabel" class="employee-summary"></div>
+
+      <label>
+        <span>날짜</span>
+        <input id="shiftDate" type="date" required />
+      </label>
+
+      <div class="form-grid" id="weekdayShiftFields">
+        <label>
+          <span>출근</span>
+          <input id="shiftStart" type="time" min="09:30" max="21:30" step="1800" required />
+        </label>
+        <label>
+          <span>퇴근</span>
+          <input id="shiftEnd" type="time" min="10:00" max="22:00" step="1800" />
+        </label>
+      </div>
+
+      <div class="weekend-notice hidden" id="weekendNotice">
+        <strong>주말 근무</strong>
+        <span>퇴근 시각은 입력하지 않습니다. 출근 시각만 저장됩니다.</span>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn danger" id="deleteShiftBtn">삭제</button>
+        <span class="spacer"></span>
+        <button class="btn ghost dialog-cancel" type="button">취소</button>
+        <button type="submit" class="btn primary">수정</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="./app.js"></script>
+</body>
+</html>

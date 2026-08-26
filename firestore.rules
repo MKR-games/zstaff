@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 직원 목록 + 존재하는 주차 키 목록
+    match /scheduler/employees {
+      allow read: if true;
+
+      allow create, update: if
+        request.resource.data.keys().hasOnly([
+          "schemaVersion",
+          "employees",
+          "knownWeeks",
+          "retentionWeeks",
+          "updatedAt",
+          "client"
+        ])
+        && request.resource.data.schemaVersion == 2
+        && request.resource.data.employees is list
+        && request.resource.data.knownWeeks is list
+        && request.resource.data.employees.size() <= 100
+        && request.resource.data.knownWeeks.size() <= 64
+        && request.resource.data.retentionWeeks >= 2
+        && request.resource.data.retentionWeeks <= 16;
+
+      allow delete: if false;
+    }
+
+    // 주차별 스케줄.
+    // 문서 ID는 해당 주 월요일 YYYY-MM-DD 형식으로 앱이 사용합니다.
+    match /scheduleWeeks/{weekId} {
+      allow read: if true;
+
+      allow create, update: if
+        request.resource.data.keys().hasOnly([
+          "schemaVersion",
+          "weekStart",
+          "shifts",
+          "personal",
+          "updatedAt",
+          "client"
+        ])
+        && request.resource.data.schemaVersion == 2
+        && request.resource.data.weekStart == weekId
+        && request.resource.data.shifts is list
+        && request.resource.data.personal is list
+
+        // 1주에 비정상적으로 거대한 데이터가 저장되는 것을 방지.
+        && request.resource.data.shifts.size() <= 500
+        && request.resource.data.personal.size() <= 500;
+
+      // 최근 8주 자동정리를 위해 주차 문서 삭제 허용.
+      allow delete: if true;
+    }
+
+    // 그 외 Firestore 경로는 모두 차단.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
