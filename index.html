@@ -2,9 +2,17 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <title>직원 스케줄러</title>
   <meta name="referrer" content="no-referrer-when-downgrade" />
+  <meta name="theme-color" content="#F5F6F8" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="직원 스케줄러" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-180.png" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -21,6 +29,7 @@
         </div>
 
         <div class="top-actions">
+          <button class="btn secondary hidden" type="button" data-install-app>앱 설치</button>
           <button class="btn secondary" id="employeeBtn">직원 등록</button>
           <button class="btn secondary" id="personalBtn">개인 일정 추가</button>
           <button class="btn copy" id="copyWeekBtn">스케줄 복사</button>
@@ -75,7 +84,10 @@
           <div class="eyebrow">MOBILE · READ ONLY SHIFT</div>
           <h2>직원 스케줄</h2>
         </div>
-        <span class="mobile-sync" id="mobileCloudStatus">연결 중…</span>
+        <div class="mobile-head-actions">
+          <button class="mobile-install-btn hidden" type="button" data-install-app>앱 설치</button>
+          <span class="mobile-sync" id="mobileCloudStatus">연결 중…</span>
+        </div>
       </div>
 
       <div class="mobile-week-nav">
@@ -283,6 +295,26 @@
     </form>
   </dialog>
 
+  <dialog id="pwaInstallDialog" class="dialog pwa-install-dialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <div class="eyebrow">INSTALL APP</div>
+          <h3>직원 스케줄러 설치</h3>
+        </div>
+        <button class="close-btn" type="button" data-close-install-dialog aria-label="닫기">×</button>
+      </div>
+
+      <div class="pwa-install-copy" id="pwaInstallCopy"></div>
+
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button class="btn primary" type="button" data-close-install-dialog>확인</button>
+      </div>
+    </div>
+  </dialog>
+
   <script src="./app.js"></script>
+  <script src="./pwa.js"></script>
 </body>
 </html>

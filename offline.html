@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#F5F6F8" />
+  <title>직원 스케줄러 · 오프라인</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f5f6f8;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Noto Sans KR",sans-serif}
+    main{width:min(420px,100%);padding:28px;border:1px solid #dfe4ea;border-radius:18px;background:#fff;text-align:center;box-shadow:0 10px 35px rgba(17,24,39,.08)}
+    h1{margin:0 0 10px;font-size:22px}p{margin:0 0 20px;color:#68717d;font-size:14px;line-height:1.65}
+    button{min-height:46px;padding:0 20px;border:0;border-radius:12px;background:#111827;color:#fff;font-size:14px;font-weight:900}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>인터넷 연결을 확인해 주세요</h1>
+    <p>저장된 화면은 열 수 있지만 Firebase의 최신 스케줄을 동기화하려면 인터넷 연결이 필요합니다.</p>
+    <button type="button" onclick="location.reload()">다시 연결</button>
+  </main>
+</body>
+</html>

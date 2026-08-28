@@ -707,6 +707,69 @@ html, body{
   display:none;
 }
 
+html{
+  background:#f5f6f8;
+}
+
+body{
+  min-height:100dvh;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.mobile-head-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:6px;
+  min-width:0;
+}
+
+.mobile-install-btn{
+  min-height:30px;
+  flex:none;
+  padding:0 10px;
+  border:1px solid #cfd6de;
+  border-radius:999px;
+  background:#111827;
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+}
+
+.pwa-install-dialog{
+  width:min(460px,calc(100% - 24px));
+}
+
+.pwa-install-copy{
+  color:#434c58;
+  font-size:14px;
+  line-height:1.7;
+}
+
+.pwa-install-copy p{
+  margin:0 0 12px;
+}
+
+.pwa-install-copy ol{
+  display:grid;
+  gap:8px;
+  margin:0;
+  padding-left:22px;
+}
+
+.pwa-install-copy strong{
+  color:#111827;
+}
+
+.pwa-install-note{
+  margin-top:16px !important;
+  padding:12px 13px;
+  border-radius:11px;
+  background:#f1f4f7;
+  color:#59636f;
+  font-size:12px;
+}
+
 @media(max-width:850px){
   body{
     background:#f5f6f8;
@@ -728,7 +791,11 @@ html, body{
     display:block;
     width:100%;
     min-width:0;
-    padding:14px 12px 24px;
+    min-height:100dvh;
+    padding-top:calc(14px + env(safe-area-inset-top));
+    padding-right:calc(12px + env(safe-area-inset-right));
+    padding-bottom:calc(24px + env(safe-area-inset-bottom));
+    padding-left:calc(12px + env(safe-area-inset-left));
   }
 
   .mobile-head{
@@ -744,7 +811,7 @@ html, body{
     letter-spacing:-.7px;
   }
   .mobile-sync{
-    max-width:44%;
+    max-width:118px;
     overflow:hidden;
     text-overflow:ellipsis;
     white-space:nowrap;
@@ -1144,7 +1211,7 @@ html, body{
   /* 개인 일정 추가를 모바일의 주 행동으로 */
   .mobile-personal-cta{
     position:sticky;
-    bottom:10px;
+    bottom:calc(10px + env(safe-area-inset-bottom));
     z-index:15;
     width:100%;
     min-height:52px;
