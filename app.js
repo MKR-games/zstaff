@@ -1647,6 +1647,108 @@
   // --------------------
   // 직원
   // --------------------
+  function normalizeEmployeeColor(value, fallback = PALETTE[0]) {
+    const color = String(value || "").trim();
+
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+      return color.toLowerCase();
+    }
+
+    return fallback;
+  }
+
+  function ensureEmployeeColorControls() {
+    if ($("#employeeColor")) return;
+
+    const roleSelect = $("#employeeRole");
+    const roleLabel = roleSelect?.closest("label");
+
+    if (!roleLabel) return;
+
+    const colorLabel = document.createElement("label");
+    colorLabel.className = "employee-color-field";
+
+    colorLabel.innerHTML = `
+      <span>직원 색상</span>
+
+      <div class="employee-color-picker">
+        <input
+          id="employeeColor"
+          class="employee-color-input"
+          type="color"
+          value="${PALETTE[0]}"
+          aria-label="직원 색상 직접 선택"
+        />
+
+        <div class="employee-color-info">
+          <strong id="employeeColorHex">${PALETTE[0].toUpperCase()}</strong>
+          <span>직접 선택하거나 아래 색상 중 고르세요.</span>
+        </div>
+      </div>
+
+      <div
+        class="employee-color-swatches"
+        id="employeeColorSwatches"
+        aria-label="빠른 색상 선택"
+      ></div>
+    `;
+
+    roleLabel.insertAdjacentElement("afterend", colorLabel);
+
+    const swatches = $("#employeeColorSwatches");
+
+    swatches.innerHTML = PALETTE.map((color) => `
+      <button
+        type="button"
+        class="employee-color-swatch"
+        data-color="${color}"
+        style="background:${color}"
+        title="${color}"
+        aria-label="${color} 색상 선택"
+      ></button>
+    `).join("");
+
+    swatches
+      .querySelectorAll(".employee-color-swatch")
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          updateEmployeeColorUI(button.dataset.color);
+        });
+      });
+
+    $("#employeeColor").addEventListener("input", (event) => {
+      updateEmployeeColorUI(event.target.value);
+    });
+  }
+
+  function updateEmployeeColorUI(value) {
+    ensureEmployeeColorControls();
+
+    const input = $("#employeeColor");
+    if (!input) return;
+
+    const normalized = normalizeEmployeeColor(
+      value,
+      input.value || PALETTE[0]
+    );
+
+    input.value = normalized;
+
+    const hex = $("#employeeColorHex");
+    if (hex) {
+      hex.textContent = normalized.toUpperCase();
+    }
+
+    document
+      .querySelectorAll(".employee-color-swatch")
+      .forEach((button) => {
+        button.classList.toggle(
+          "active",
+          button.dataset.color.toLowerCase() === normalized
+        );
+      });
+  }
+
   function openEmployee(id = null) {
     const dlg = $("#employeeDialog");
     const isEdit = !!id;
@@ -1656,6 +1758,16 @@
     $("#employeeId").value = id || "";
     $("#employeeName").value = emp?.name || "";
     $("#employeeRole").value = emp?.role || "정직원";
+
+    ensureEmployeeColorControls();
+
+    const fallbackColor =
+      PALETTE[state.employees.length % PALETTE.length];
+
+    updateEmployeeColorUI(
+      normalizeEmployeeColor(emp?.color, fallbackColor)
+    );
+
     $("#deleteEmployeeBtn").classList.toggle("hidden", !isEdit);
 
     dlg.showModal();
@@ -1669,18 +1781,26 @@
     const name = $("#employeeName").value.trim();
     const role = $("#employeeRole").value;
 
+    ensureEmployeeColorControls();
+
+    const color = normalizeEmployeeColor(
+      $("#employeeColor")?.value,
+      PALETTE[state.employees.length % PALETTE.length]
+    );
+
     if (!name) return;
 
     if (id) {
       const emp = employeeById(id);
       emp.name = name;
       emp.role = role;
+      emp.color = color;
     } else {
       state.employees.push({
         id: uid("emp"),
         name,
         role,
-        color: PALETTE[state.employees.length % PALETTE.length]
+        color
       });
     }
 
@@ -2104,31 +2224,117 @@
     ctx.fillText(value + "…", x, y);
   }
 
+  function canvasTextColor(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.66 ? "#101827" : "#ffffff";
+  }
+
+  function canvasPersonalReason(personalItems) {
+    const reasons = personalItems
+      .map((item) => String(item.memo || "").trim())
+      .filter(Boolean);
+
+    if (!reasons.length) return "";
+
+    const unique = [...new Set(reasons)];
+    return unique.join(" / ");
+  }
+
+  function drawCaptureLegendItem(ctx, x, y, type, label) {
+    const boxW = 18;
+    const boxH = 12;
+
+    if (type === "personal") {
+      ctx.fillStyle = "rgba(80,88,98,.22)";
+      roundRect(ctx, x, y - 10, boxW, boxH, 3);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(80,88,98,.46)";
+      ctx.stroke();
+    } else if (type === "prep") {
+      ctx.fillStyle = "#FFD400";
+      roundRect(ctx, x, y - 10, boxW, boxH, 3);
+      ctx.fill();
+      ctx.strokeStyle = "#D8B400";
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#4f7df3";
+      roundRect(ctx, x, y - 10, boxW, boxH, 3);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#5f6976";
+    ctx.font = '600 10px "Noto Sans KR", Arial, sans-serif';
+    ctx.fillText(label, x + boxW + 7, y);
+  }
+
   function buildScheduleCanvas(range = "all") {
     const weekStart = currentMonday();
-    const fullWeekEnd = addDays(weekStart, 6);
 
     const rangeMap = {
       all: { startOffset: 0, dayCount: 7, label: "전체 · 월~일" },
       weekday: { startOffset: 0, dayCount: 5, label: "주간 · 월~금" },
       weekend: { startOffset: 5, dayCount: 2, label: "주말 · 토~일" }
     };
+
     const selected = rangeMap[range] || rangeMap.all;
     const captureStart = addDays(weekStart, selected.startOffset);
     const captureEnd = addDays(captureStart, selected.dayCount - 1);
 
+    /*
+     * v16.3 캡처 기준
+     * - 카카오톡으로 보내 스마트폰에서 보는 것을 최우선
+     * - 해당 날짜 실제 근무자만 표시
+     * - 직원명/근무시간/개인 일정 사유를 크게 표시
+     * - 시간축 숫자도 확대 없이 읽히도록 크게 표시
+     */
     const scale = 2;
-    const margin = 32;
-    const leftW = 230;
-    const timeW = 1180;
-    const titleH = 96;
-    const dayHeadH = 48;
-    const rowH = 50;
-    const footerH = 44;
+    const margin = 24;
+    const leftW = 390;
+    const timeW = 610;
     const contentW = leftW + timeW;
-    const dayH = dayHeadH + Math.max(1, state.employees.length) * rowH;
+
+    const titleH = 138;
+    const dayHeadH = 86;
+    // 이름+근무시간을 한 줄로 표시하므로 캡처 행 높이를 압축
+    const rowH = 82;
+    const emptyDayH = 62;
+    const footerH = 88;
+
+    const dayInfos = [];
+
+    for (let di = 0; di < selected.dayCount; di++) {
+      const dateObj = addDays(captureStart, di);
+      const date = ymd(dateObj);
+
+      const employees = state.employees.filter((employee) =>
+        state.shifts.some(
+          (shift) =>
+            shift.employeeId === employee.id &&
+            shift.date === date
+        )
+      );
+
+      dayInfos.push({ dateObj, date, employees });
+    }
+
+    const daySectionGap = 14;
+
+    const daysHeight = dayInfos.reduce((sum, info, index) => {
+      return sum +
+        dayHeadH +
+        (info.employees.length
+          ? info.employees.length * rowH
+          : emptyDayH) +
+        (index < dayInfos.length - 1 ? daySectionGap : 0);
+    }, 0);
+
     const width = margin * 2 + contentW;
-    const height = margin * 2 + titleH + dayH * selected.dayCount + footerH;
+    const height =
+      margin * 2 +
+      titleH +
+      daysHeight +
+      footerH;
 
     const canvas = document.createElement("canvas");
     canvas.width = width * scale;
@@ -2136,266 +2342,582 @@
 
     const ctx = canvas.getContext("2d");
     ctx.scale(scale, scale);
+    ctx.textBaseline = "alphabetic";
 
-    ctx.fillStyle = "#f4f6f8";
+    ctx.fillStyle = "#f2f4f7";
     ctx.fillRect(0, 0, width, height);
 
-    // 전체 카드
     ctx.fillStyle = "#ffffff";
-    roundRect(ctx, margin, margin, contentW, height - margin * 2, 16);
+    roundRect(
+      ctx,
+      margin,
+      margin,
+      contentW,
+      height - margin * 2,
+      18
+    );
     ctx.fill();
 
-    // 제목
-    ctx.fillStyle = "#15191f";
-    ctx.font = '800 26px "Noto Sans KR", Arial, sans-serif';
-    ctx.fillText("직원 주간 스케줄", margin + 22, margin + 36);
+    // ===== 제목 =====
+    ctx.fillStyle = "#111827";
+    ctx.font = '900 39px "Noto Sans KR", Arial, sans-serif';
+    ctx.fillText("직원 스케줄", margin + 22, margin + 48);
 
-    ctx.fillStyle = "#737c88";
-    ctx.font = '600 13px "Noto Sans KR", Arial, sans-serif';
+    ctx.fillStyle = "#374151";
+    ctx.font = '900 19px "Noto Sans KR", Arial, sans-serif';
     ctx.fillText(
-      `${captureStart.getFullYear()}. ${captureStart.getMonth() + 1}. ${captureStart.getDate()}.  —  ` +
-      `${captureEnd.getFullYear()}. ${captureEnd.getMonth() + 1}. ${captureEnd.getDate()}.`,
+      `${captureStart.getMonth() + 1}/${captureStart.getDate()} ~ ` +
+      `${captureEnd.getMonth() + 1}/${captureEnd.getDate()}`,
       margin + 22,
-      margin + 61
+      margin + 83
     );
 
-    ctx.font = '500 11px "Noto Sans KR", Arial, sans-serif';
+    ctx.fillStyle = "#6b7280";
+    ctx.font = '750 14px "Noto Sans KR", Arial, sans-serif';
     ctx.fillText(
-      `${selected.label} · 근무 입력 09:30–22:00 · 토/일 퇴근 미정`,
+      `${selected.label} · 근무자만 표시 · 주말 퇴근 미정`,
       margin + 22,
-      margin + 81
+      margin + 113
     );
 
     const koDays = ["일", "월", "화", "수", "목", "금", "토"];
     let y = margin + titleH;
 
-    for (let di = 0; di < selected.dayCount; di++) {
-      const d = addDays(captureStart, di);
-      const ds = ymd(d);
-      const dow = d.getDay();
+    const CAPTURE_START_MIN = 10 * 60;
 
-      // 요일 헤더
-      ctx.fillStyle = "#f7f8fa";
+    const timeX = (minute) =>
+      margin +
+      leftW +
+      ((minute - CAPTURE_START_MIN) / (END_MIN - CAPTURE_START_MIN)) * timeW;
+
+    // 캡처 시간축: 10:00부터 22:00까지 2시간 단위 표시.
+    const rulerLabels = [];
+    for (
+      let minute = CAPTURE_START_MIN;
+      minute <= END_MIN;
+      minute += 120
+    ) {
+      rulerLabels.push(minute);
+    }
+
+    for (const [dayIndex, info] of dayInfos.entries()) {
+      const d = info.dateObj;
+      const ds = info.date;
+      const dow = d.getDay();
+      const sectionTopY = y;
+
+      // ===== 날짜 + 시간 헤더 =====
+      ctx.fillStyle =
+        dow === 0
+          ? "#fff5f5"
+          : dow === 6
+            ? "#f4f7ff"
+            : "#f7f8fa";
+
       ctx.fillRect(margin, y, contentW, dayHeadH);
 
-      ctx.strokeStyle = "#dfe4ea";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#cbd3dd";
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(margin, y + dayHeadH);
       ctx.lineTo(margin + contentW, y + dayHeadH);
       ctx.stroke();
 
-      ctx.fillStyle = dow === 0 ? "#d64545" : dow === 6 ? "#2267d8" : "#15191f";
-      ctx.font = '800 15px "Noto Sans KR", Arial, sans-serif';
+      ctx.beginPath();
+      ctx.moveTo(margin + leftW, y);
+      ctx.lineTo(margin + leftW, y + dayHeadH);
+      ctx.stroke();
+
+      ctx.fillStyle =
+        dow === 0
+          ? "#d64545"
+          : dow === 6
+            ? "#2267d8"
+            : "#111827";
+
+      ctx.font = '900 25px "Noto Sans KR", Arial, sans-serif';
       ctx.fillText(
-        `${koDays[dow]}요일  ${d.getMonth() + 1}/${d.getDate()}`,
-        margin + 14,
-        y + 30
+        `${d.getMonth() + 1}월 ${d.getDate()}일 ${koDays[dow]}요일`,
+        margin + 18,
+        y + 34
       );
 
-      // 시간 눈금
-      ctx.fillStyle = "#747d89";
-      ctx.font = '600 9px Arial, sans-serif';
+      ctx.fillStyle = "#67717f";
+      ctx.font = '800 14px "Noto Sans KR", Arial, sans-serif';
+      ctx.fillText(
+        `근무 ${info.employees.length}명`,
+        margin + 18,
+        y + 63
+      );
 
-      // 09:30은 여유 입력 구간이므로 숫자를 표시하지 않고,
-      // 실제 출근 기준인 10:00부터 정각만 표시합니다.
-      for (let m = 10 * 60; m < END_MIN; m += 60) {
-        const px = margin + leftW + ((m - START_MIN) / (END_MIN - START_MIN)) * timeW;
+      // 캡처 시간 라벨:
+      // 10:00 / 22:00 = 검정 박스 + 흰 글씨
+      // 11:00~21:00 = 흰 박스 + 검정 글씨
+      rulerLabels.forEach((minute) => {
+        const gx = timeX(minute);
+        const isStart = minute === CAPTURE_START_MIN;
+        const isEnd = minute === END_MIN;
+        const label = timeFromMin(minute);
 
-        if (m === 10 * 60) {
-          ctx.fillStyle = "#111827";
-          roundRect(ctx, px - 3, y + 13, 39, 21, 5);
-          ctx.fill();
+        ctx.strokeStyle = "#bfc8d3";
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(gx, y + 43);
+        ctx.lineTo(gx, y + dayHeadH);
+        ctx.stroke();
 
-          ctx.fillStyle = "#ffffff";
-          ctx.font = '800 9px Arial, sans-serif';
-          ctx.fillText("10:00", px + 2, y + 27);
-        } else {
-          ctx.fillStyle = "#4f5965";
-          ctx.font = '700 9px Arial, sans-serif';
-          ctx.fillText(timeFromMin(m), px + 3, y + 29);
+        ctx.font = '900 14px Arial, sans-serif';
+
+        const boxW = 50;
+        const boxH = 24;
+        const boxX = isStart
+          ? gx + 3
+          : isEnd
+            ? gx - boxW - 3
+            : gx - boxW / 2;
+        const boxY = y + 8;
+
+        ctx.fillStyle = (isStart || isEnd) ? "#101827" : "#ffffff";
+        roundRect(ctx, boxX, boxY, boxW, boxH, 6);
+        ctx.fill();
+
+        if (!(isStart || isEnd)) {
+          ctx.strokeStyle = "#cbd3dd";
+          ctx.lineWidth = 1;
+          ctx.stroke();
         }
-      }
 
-      ctx.fillStyle = "#111827";
-      ctx.font = '800 9px Arial, sans-serif';
-      ctx.fillText("22:00", margin + leftW + timeW - 30, y + 29);
+        ctx.fillStyle = (isStart || isEnd) ? "#ffffff" : "#111827";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          label,
+          boxX + boxW / 2,
+          boxY + 17
+        );
+      });
 
+      ctx.textAlign = "left";
       y += dayHeadH;
 
-      const employees = state.employees.length ? state.employees : [null];
+      // ===== 근무자 없음 =====
+      if (!info.employees.length) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(margin, y, contentW, emptyDayH);
 
-      employees.forEach((emp) => {
-        // 행 배경
+        ctx.strokeStyle = "#e1e5ea";
+        ctx.beginPath();
+        ctx.moveTo(margin, y + emptyDayH);
+        ctx.lineTo(margin + contentW, y + emptyDayH);
+        ctx.stroke();
+
+        ctx.fillStyle = "#8a94a0";
+        ctx.font = '850 19px "Noto Sans KR", Arial, sans-serif';
+        ctx.fillText(
+          "근무자 없음",
+          margin + 20,
+          y + 39
+        );
+
+        y += emptyDayH;
+
+        if (dayIndex < dayInfos.length - 1) {
+          const sepY = y + 6;
+
+          ctx.fillStyle = "#d8dee6";
+          roundRect(ctx, margin + 16, sepY, contentW - 32, 3, 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#f4f6f8";
+          roundRect(ctx, margin + 16, sepY + 5, contentW - 32, 6, 3);
+          ctx.fill();
+
+          y += daySectionGap;
+        }
+
+        continue;
+      }
+
+      for (const emp of info.employees) {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(margin, y, contentW, rowH);
 
-        ctx.strokeStyle = "#edf0f3";
+        ctx.strokeStyle = "#e2e6eb";
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(margin, y + rowH);
         ctx.lineTo(margin + contentW, y + rowH);
         ctx.stroke();
 
-        ctx.strokeStyle = "#dfe4ea";
+        ctx.strokeStyle = "#cbd3dd";
         ctx.beginPath();
         ctx.moveTo(margin + leftW, y);
         ctx.lineTo(margin + leftW, y + rowH);
         ctx.stroke();
 
-        // 30분 그리드
-        for (let slot = 0; slot <= TOTAL_SLOTS; slot++) {
-          const gx = margin + leftW + (slot / TOTAL_SLOTS) * timeW;
-          ctx.strokeStyle = slot % 2 === 0 ? "#e1e5ea" : "#f0f2f4";
+        // 캡처용 시간 그리드는 10:00~22:00만 표시
+        for (
+          let minute = CAPTURE_START_MIN;
+          minute <= END_MIN;
+          minute += SNAP_MIN
+        ) {
+          const gx = timeX(minute);
+          const isHour = minute % 60 === 0;
+
+          ctx.strokeStyle =
+            isHour ? "#d7dde5" : "#f2f4f7";
+          ctx.lineWidth =
+            isHour ? 1 : 0.55;
+
           ctx.beginPath();
           ctx.moveTo(gx, y);
           ctx.lineTo(gx, y + rowH);
           ctx.stroke();
         }
 
-        if (!emp) {
-          ctx.fillStyle = "#8a929d";
-          ctx.font = '600 12px "Noto Sans KR", Arial, sans-serif';
-          ctx.fillText("등록 직원 없음", margin + 14, y + 30);
-          y += rowH;
-          return;
-        }
-
-        // 직원명
-        ctx.fillStyle = emp.color;
-        ctx.beginPath();
-        ctx.arc(margin + 16, y + rowH / 2, 5, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "#15191f";
-        ctx.font = '800 12px "Noto Sans KR", Arial, sans-serif';
-        drawText(
-          ctx,
-          `${emp.role === "관리자" ? "★ " : ""}${emp.name}`,
-          margin + 29,
-          y + 21,
-          leftW - 44
+        const shiftItems = state.shifts.filter(
+          (shift) =>
+            shift.employeeId === emp.id &&
+            shift.date === ds
         );
 
-        ctx.fillStyle = "#747d89";
-        ctx.font = '500 9px "Noto Sans KR", Arial, sans-serif';
-        drawText(ctx, emp.role, margin + 29, y + 36, leftW - 44);
+        const personalItems = state.personal.filter(
+          (personal) =>
+            personal.employeeId === emp.id &&
+            personal.date === ds
+        );
 
-        const timeX = (minute) =>
-          margin + leftW + ((minute - START_MIN) / (END_MIN - START_MIN)) * timeW;
+        const personalReason =
+          canvasPersonalReason(personalItems);
 
-        // 개인 일정
-        state.personal
-          .filter((p) => p.employeeId === emp.id && p.date === ds)
-          .forEach((p) => {
-            let st, en;
-            if (p.allDay) {
-              st = START_MIN;
-              en = END_MIN;
-            } else {
-              st = Math.max(START_MIN, minFromTime(p.start));
-              en = Math.min(END_MIN, minFromTime(p.end));
-            }
+        const primaryShift =
+          shiftItems[0] || null;
 
-            if (en <= st) return;
+        const weekend =
+          isWeekend(ds);
 
-            const x1 = timeX(st);
-            const x2 = timeX(en);
+        // ===== 직원명 + 근무시간 같은 줄 =====
+        ctx.fillStyle = emp.color;
+        ctx.beginPath();
+        ctx.arc(margin + 22, y + 23, 7, 0, Math.PI * 2);
+        ctx.fill();
 
-            ctx.fillStyle = "rgba(80,88,98,.18)";
-            roundRect(ctx, x1, y + 7, x2 - x1, rowH - 14, 6);
-            ctx.fill();
+        const displayName =
+          `${emp.role === "관리자" ? "★ " : ""}${emp.name}`;
 
-            ctx.strokeStyle = "rgba(80,88,98,.32)";
-            ctx.stroke();
+        const captureShiftText = primaryShift
+          ? (
+              weekend
+                ? `${primaryShift.start} 출근`
+                : `${primaryShift.start}–${primaryShift.end}`
+            )
+          : "";
 
-            ctx.fillStyle = "#5b626c";
-            ctx.font = '600 8px "Noto Sans KR", Arial, sans-serif';
-            const label = p.allDay
-              ? "개인 일정 · 종일"
-              : `개인 ${p.start}–${p.end}`;
-            drawText(ctx, label, x1 + 5, y + 27, Math.max(0, x2 - x1 - 10));
-          });
+        const nameX = margin + 40;
+        const lineY = y + 31;
 
-        // 주말: 최초 출근자(동률 포함)를 제외한 직원의 출근 직전 1시간
-        if (isWeekend(ds)) {
-          const firstStart = earliestWeekendStart(ds);
+        // 이름을 먼저 그린 뒤 바로 옆에 근무시간을 표시합니다.
+        ctx.fillStyle = "#111827";
+        ctx.font = '900 23px "Noto Sans KR", Arial, sans-serif';
+        ctx.textAlign = "left";
 
-          state.shifts
-            .filter((s) => s.employeeId === emp.id && s.date === ds && s.start)
-            .forEach((s) => {
-              const st = minFromTime(s.start);
-              if (firstStart == null || st <= firstStart) return;
+        const maxNameWidth = captureShiftText
+          ? leftW - 210
+          : leftW - 58;
 
-              const prepStart = Math.max(START_MIN, st - 60);
-              const prepEnd = st;
-              if (prepEnd <= prepStart) return;
+        drawText(
+          ctx,
+          displayName,
+          nameX,
+          lineY,
+          maxNameWidth
+        );
 
-              const x1 = timeX(prepStart);
-              const x2 = timeX(prepEnd);
+        const measuredName = Math.min(
+          ctx.measureText(displayName).width,
+          maxNameWidth
+        );
 
-              ctx.fillStyle = "#FFD400";
-              roundRect(ctx, x1, y + 7, Math.max(8, x2 - x1), rowH - 14, 6);
-              ctx.fill();
+        if (captureShiftText) {
+          const timeX = Math.min(
+            margin + leftW - 18,
+            nameX + measuredName + 18
+          );
 
-              ctx.strokeStyle = "#D8B400";
-              ctx.stroke();
-            });
+          ctx.fillStyle = "#111827";
+          ctx.font = '900 18px Arial, "Noto Sans KR", sans-serif';
+          ctx.textAlign = "left";
+          drawText(
+            ctx,
+            captureShiftText,
+            timeX,
+            lineY,
+            margin + leftW - 18 - timeX
+          );
         }
 
-        // 근무
-        state.shifts
-          .filter((s) => s.employeeId === emp.id && s.date === ds)
-          .forEach((s) => {
-            const st = minFromTime(s.start);
-            const weekend = isWeekend(ds);
-            const en = weekend ? END_MIN : minFromTime(s.end);
+        ctx.fillStyle = "#747e8a";
+        ctx.font = '750 12px "Noto Sans KR", Arial, sans-serif';
+        ctx.textAlign = "left";
+        drawText(
+          ctx,
+          emp.role,
+          nameX,
+          y + 52,
+          leftW - 58
+        );
 
-            if (st == null || en == null) return;
+        // ===== 개인 일정 사유 =====
+        if (personalItems.length) {
+          ctx.fillStyle = "#6d5700";
+          ctx.font = '850 14px "Noto Sans KR", Arial, sans-serif';
+          drawText(
+            ctx,
+            personalReason
+              ? `개인 일정 · ${personalReason}`
+              : "개인 일정 · 사유 미입력",
+            nameX,
+            y + 73,
+            leftW - 58
+          );
+        }
 
-            const x1 = timeX(st);
-            const x2 = timeX(en);
+        ctx.textAlign = "left";
 
-            ctx.fillStyle = weekend ? rgba(emp.color, .72) : emp.color;
-            roundRect(ctx, x1, y + 10, Math.max(20, x2 - x1), rowH - 20, 7);
-            ctx.fill();
+        // ===== 개인 일정 블록 =====
+        personalItems.forEach((p) => {
+          let st;
+          let en;
 
-            // 주말은 오른쪽으로 옅어지는 느낌을 흰색 오버레이로 표현
-            if (weekend) {
-              const grad = ctx.createLinearGradient(x1, 0, x2, 0);
-              grad.addColorStop(0, "rgba(255,255,255,0)");
-              grad.addColorStop(.45, "rgba(255,255,255,.06)");
-              grad.addColorStop(1, "rgba(255,255,255,.68)");
-              ctx.fillStyle = grad;
-              roundRect(ctx, x1, y + 10, Math.max(20, x2 - x1), rowH - 20, 7);
-              ctx.fill();
-            }
+          if (p.allDay) {
+            st = CAPTURE_START_MIN;
+            en = END_MIN;
+          } else {
+            st = Math.max(CAPTURE_START_MIN, minFromTime(p.start));
+            en = Math.min(END_MIN, minFromTime(p.end));
+          }
 
-            ctx.fillStyle = "#ffffff";
-            ctx.font = '800 9px "Noto Sans KR", Arial, sans-serif';
-            const label = weekend
-              ? `${emp.name} · ${s.start} 출근 · 퇴근 미정`
-              : `${emp.name} · ${s.start}–${s.end}`;
+          if (en <= st) return;
+
+          const x1 = timeX(st);
+          const x2 = timeX(en);
+          const blockW = Math.max(8, x2 - x1);
+
+          ctx.fillStyle = "#fff0a8";
+          roundRect(
+            ctx,
+            x1,
+            y + 9,
+            blockW,
+            rowH - 18,
+            8
+          );
+          ctx.fill();
+
+          ctx.strokeStyle = "#d7bb38";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          const memo = String(p.memo || "").trim();
+
+          if (blockW >= 105) {
+            ctx.fillStyle = "#4f4200";
+            ctx.font = '900 12px Arial, sans-serif';
 
             drawText(
               ctx,
-              label,
-              x1 + 7,
-              y + 30,
-              Math.max(0, x2 - x1 - 14)
+              p.allDay
+                ? "개인 일정"
+                : `${p.start}–${p.end}`,
+              x1 + 8,
+              y + 34,
+              Math.max(0, blockW - 16)
             );
+
+            if (memo) {
+              ctx.fillStyle = "#665600";
+              ctx.font = '850 11px "Noto Sans KR", Arial, sans-serif';
+              drawText(
+                ctx,
+                memo,
+                x1 + 8,
+                y + 55,
+                Math.max(0, blockW - 16)
+              );
+            }
+          }
+        });
+
+        // ===== 주말 후속 출근자 직전 1시간 =====
+        if (weekend) {
+          const firstStart = earliestWeekendStart(ds);
+
+          shiftItems.forEach((shift) => {
+            const st = minFromTime(shift.start);
+
+            if (firstStart == null || st <= firstStart) {
+              return;
+            }
+
+            const prepStart = Math.max(CAPTURE_START_MIN, st - 60);
+            const x1 = timeX(prepStart);
+            const x2 = timeX(st);
+
+            ctx.fillStyle = "#FFD400";
+            roundRect(
+              ctx,
+              x1,
+              y + 12,
+              Math.max(8, x2 - x1),
+              rowH - 24,
+              8
+            );
+            ctx.fill();
+
+            ctx.strokeStyle = "#D8B400";
+            ctx.stroke();
           });
+        }
+
+        // ===== 근무 블록 =====
+        shiftItems.forEach((shift) => {
+          const rawStart = minFromTime(shift.start);
+          const st = rawStart == null
+            ? null
+            : Math.max(CAPTURE_START_MIN, rawStart);
+          const en = weekend
+            ? END_MIN
+            : minFromTime(shift.end);
+
+          if (st == null || en == null || en <= CAPTURE_START_MIN) return;
+
+          const x1 = timeX(st);
+          const x2 = timeX(en);
+          const blockW = Math.max(20, x2 - x1);
+
+          ctx.fillStyle = weekend
+            ? rgba(emp.color, .72)
+            : emp.color;
+
+          roundRect(
+            ctx,
+            x1,
+            y + 14,
+            blockW,
+            rowH - 28,
+            8
+          );
+          ctx.fill();
+
+          if (weekend) {
+            const grad = ctx.createLinearGradient(x1, 0, x2, 0);
+            grad.addColorStop(0, "rgba(255,255,255,0)");
+            grad.addColorStop(.55, "rgba(255,255,255,.08)");
+            grad.addColorStop(1, "rgba(255,255,255,.78)");
+
+            ctx.fillStyle = grad;
+            roundRect(
+              ctx,
+              x1,
+              y + 14,
+              blockW,
+              rowH - 28,
+              8
+            );
+            ctx.fill();
+          }
+
+          // 근무 블록 내부 시간은 전체 문자열이 반드시 보이게 표시
+          const label = weekend
+            ? `${shift.start} 출근`
+            : `${shift.start}–${shift.end}`;
+
+          ctx.font = '900 14px Arial, "Noto Sans KR", sans-serif';
+
+          const measured = ctx.measureText(label).width;
+          const plateW = Math.max(78, measured + 20);
+          const timelineLeft = margin + leftW;
+          const timelineRight = margin + leftW + timeW;
+
+          // 근무 바가 짧아도 시간 라벨 박스는 필요한 만큼 넓게 유지.
+          // 단, 전체 타임라인 밖으로는 나가지 않게 위치만 조정.
+          let plateX = x1 + 5;
+
+          if (plateX + plateW > timelineRight - 4) {
+            plateX = timelineRight - plateW - 4;
+          }
+
+          if (plateX < timelineLeft + 4) {
+            plateX = timelineLeft + 4;
+          }
+
+          ctx.fillStyle = "rgba(255,255,255,.95)";
+          roundRect(
+            ctx,
+            plateX,
+            y + 25,
+            plateW,
+            30,
+            7
+          );
+          ctx.fill();
+
+          ctx.fillStyle = "#111827";
+          ctx.font = '900 14px Arial, "Noto Sans KR", sans-serif';
+          ctx.textAlign = "left";
+
+          // drawText의 말줄임을 사용하지 않고 직접 출력해서 시간 전체를 보장
+          ctx.fillText(
+            label,
+            plateX + 10,
+            y + 45
+          );
+
+          ctx.textAlign = "left";
+        });
 
         y += rowH;
-      });
+      }
+
+      if (dayIndex < dayInfos.length - 1) {
+        const sepY = y + 6;
+
+        ctx.fillStyle = "#d8dee6";
+        roundRect(ctx, margin + 16, sepY, contentW - 32, 3, 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#f4f6f8";
+        roundRect(ctx, margin + 16, sepY + 5, contentW - 32, 6, 3);
+        ctx.fill();
+
+        y += daySectionGap;
+      }
     }
 
-    // 하단 안내
-    ctx.fillStyle = "#747d89";
-    ctx.font = '500 10px "Noto Sans KR", Arial, sans-serif';
+    // ===== 하단 범례 =====
+    const footerY = height - margin - 49;
+
+    drawCaptureLegendItem(
+      ctx,
+      margin + 18,
+      footerY,
+      "personal",
+      "개인 일정"
+    );
+
+    drawCaptureLegendItem(
+      ctx,
+      margin + 185,
+      footerY,
+      "prep",
+      "주말 출근 직전 1시간"
+    );
+
+    ctx.fillStyle = "#687381";
+    ctx.font = '750 11px "Noto Sans KR", Arial, sans-serif';
     ctx.fillText(
-      "※ 회색 영역은 개인 일정/근무 불가 시간입니다. 주말 근무는 출근 시각만 확정된 상태입니다.",
-      margin + 16,
-      height - margin - 16
+      "시간축: 10:00 · 12:00 · 14:00 · 16:00 · 18:00 · 20:00 · 22:00",
+      margin + 18,
+      footerY + 27
     );
 
     return canvas;

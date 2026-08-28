@@ -1212,3 +1212,88 @@ html, body{
     font-size:20px;
   }
 }
+
+
+/* ===== 직원 색상 직접 선택 ===== */
+.employee-color-field{
+  display:grid;
+  gap:8px;
+}
+
+.employee-color-picker{
+  display:grid;
+  grid-template-columns:58px minmax(0,1fr);
+  gap:11px;
+  align-items:center;
+}
+
+.employee-color-input{
+  width:58px;
+  height:48px;
+  min-height:48px;
+  padding:4px;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+.employee-color-input::-webkit-color-swatch-wrapper{
+  padding:2px;
+}
+
+.employee-color-input::-webkit-color-swatch{
+  border:0;
+  border-radius:7px;
+}
+
+.employee-color-input::-moz-color-swatch{
+  border:0;
+  border-radius:7px;
+}
+
+.employee-color-info{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+
+.employee-color-info strong{
+  font-size:13px;
+  letter-spacing:.2px;
+}
+
+.employee-color-info span{
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.4;
+}
+
+.employee-color-swatches{
+  display:grid;
+  grid-template-columns:repeat(10,1fr);
+  gap:7px;
+}
+
+.employee-color-swatch{
+  width:100%;
+  aspect-ratio:1;
+  min-height:28px;
+  padding:0;
+  border:2px solid transparent;
+  border-radius:8px;
+  cursor:pointer;
+  box-shadow:inset 0 0 0 1px rgba(17,24,39,.09);
+}
+
+.employee-color-swatch.active{
+  border-color:#111827;
+  box-shadow:
+    0 0 0 2px #fff inset,
+    0 0 0 1px #111827;
+}
+
+@media(max-width:430px){
+  .employee-color-swatches{
+    grid-template-columns:repeat(5,1fr);
+  }
+}
